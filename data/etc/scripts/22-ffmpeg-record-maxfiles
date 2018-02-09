@@ -1,6 +1,9 @@
 #!/bin/sh
 PIDFILE="/var/run/ffmpeg-record.pid"
 
+PARTLENGTH=10
+KEEPPARTS=3
+
 status()
 {
   pid="$(cat "$PIDFILE" 2>/dev/null)"
@@ -11,14 +14,15 @@ status()
 
 start()
 {
+  killall ffmpeg
+  
   LOG=/dev/null
   echo "Starting FFMPEG record..."
   FFMPEG_HOME="/media/mmcblk0p2/data/test/ffmpeg"
   STORAGE_HOME="/media/mmcblk0p2/data/storage"
-  unixdate=$(date +%s)
-  streamname="stream-${unixdate}"
-  mkdir -p $STORAGE_HOME/$streamname  
-  $FFMPEG_HOME/ffmpeg -i rtsp://localhost/unicast -c copy -hls_time 10 -hls_list_size 0 $STORAGE_HOME/$streamname/stream.m3u8 >$LOG 2>&1 &
+  mkdir -p $STORAGE_HOME/$streamname
+  cd $STORAGE_HOME/$streamname
+  $FFMPEG_HOME/ffmpeg -i rtsp://localhost/unicast -rtsp_transport tcp -c copy -use_localtime 1 -hls_segment_filename 'camera1_%Y.%m.%d_%H.%M.%S.ts' -hls_time $PARTLENGTH -hls_list_size $KEEPPARTS -hls_flags delete_segments $STORAGE_HOME/$streamname/stream.m3u8 >$LOG 2>&1 &
   echo "$!" > "$PIDFILE"
 }
 
