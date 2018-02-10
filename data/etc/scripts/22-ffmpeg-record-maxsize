@@ -1,8 +1,11 @@
 #!/bin/sh
 PIDFILE="/var/run/ffmpeg-record.pid"
+PIDFILE2="/var/run/space-watcher.pid"
 
+PARTLENGTH=10
 FILESYSTEM=/dev/mmcblk0p2 #filesystem to monitor
-CAPACITY=90 # delete oldest if FS is over 90% of usage 
+MAXCAPACITY=1 # delete oldest if STORAGE_HOME is over $MAXCAPACITY% of usage 
+
 PIDFILE2="/var/run/freespace-watcher.pid"
 STORAGE_HOME="/media/mmcblk0p2/data/storage"
   
@@ -12,6 +15,10 @@ status()
   if [ "$pid" ]; then
     kill -0 "$pid" >/dev/null && echo "PID: $pid" || return 1
   fi
+  pid2="$(cat "$PIDFILE2" 2>/dev/null)"
+  if [ "$pid2" ]; then
+    kill -0 "$pid2" >/dev/null && echo ", PID2: $pid2" || return 1
+  fi
 }
 
 start()
@@ -20,22 +27,27 @@ start()
   
   LOG=/dev/null
   echo "Starting FFMPEG record and watchers..."
+  echo $(df /media/mmcblk0p2/data/storage | grep -v Used | awk '{print $5}') disk usage now - starting cleaner to bellow $MAXCAPACITY%...
   FFMPEG_HOME="/media/mmcblk0p2/data/test/ffmpeg"
-  #unixdate=$(date +%s)
-  #streamname="stream-${unixdate}"
   mkdir -p $STORAGE_HOME
   cd $STORAGE_HOME
-  $FFMPEG_HOME/ffmpeg -i rtsp://localhost/unicast -rtsp_transport tcp  -c copy -use_localtime 1 -hls_segment_filename 'camera1_%Y.%m.%d_%H.%M.%S.ts' -hls_time 10 -hls_list_size 0 $STORAGE_HOME/$streamname/stream.m3u8 >$LOG 2>&1 &
+  $FFMPEG_HOME/ffmpeg -i rtsp://localhost/unicast -rtsp_transport tcp  -c copy -use_localtime 1 -hls_segment_filename 'camera1_%Y.%m.%d_%H.%M.%S.ts' -hls_time $PARTLENGTH -hls_list_size 0 $STORAGE_HOME/$streamname/stream.m3u8 >$LOG 2>&1 &
   echo "$!" > "$PIDFILE"
-  
-  
+  echo "FFMPEG PID is $!"
+  while true; do if [ $(df $STORAGE_HOME | grep -v Used | awk '{print $5}' | tr "%" " ")  -gt $MAXCAPACITY ]; then rm -f $(ls $STORAGE_HOME -1tr | grep -v older | head -n 1); sleep 10; fi; done >$LOG 2>&1 &
+  echo "$!" > "$PIDFILE2"
+  echo "SPACE-WATCHER PID is $!"
 }
 
 stop()
 {
   pid="$(cat "$PIDFILE" 2>/dev/null)"
   if [ "$pid" ]; then
-     kill $pid ||  rm "$PIDFILE"
+     kill $pid || rm "$PIDFILE"
+  fi
+  pid2="$(cat "$PIDFILE2" 2>/dev/null)"
+  if [ "$pid2" ]; then
+     kill $pid2 || rm "$PIDFILE2"
   fi
 }
 
