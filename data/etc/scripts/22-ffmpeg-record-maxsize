@@ -27,7 +27,7 @@ start()
   
   LOG=/dev/null
   echo "Starting FFMPEG record and watchers..."
-  echo $(df /media/mmcblk0p2/data/storage | grep -v Used | awk '{print $5}') disk usage now - starting cleaner to bellow $MAXCAPACITY%...
+  echo $(df /media/mmcblk0p2/data/storage | grep -v Used | awk '{print $5}') disk usage now - starting cleaner above $MAXCAPACITY%...
   FFMPEG_HOME="/media/mmcblk0p2/data/test/ffmpeg"
   mkdir -p $STORAGE_HOME
   cd $STORAGE_HOME
